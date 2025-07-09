@@ -92,10 +92,11 @@ namespace Exam_System.Controllers
         public IActionResult DeleteExam([FromRoute]int id)
         {
             var examFromDb = examRepo.GetById(id);
-            if (examFromDb == null) return NotFound($"Exam with Id: {id} not found.");
+            if (examFromDb == null) return NotFound(new { message = $"Exam with Id: {id} Not Found." });
             examRepo.Delete(examFromDb);
             examRepo.Save();
-            return Ok($"Exam with Id: {id} deleted successfully.");
+            return Ok(new { message = $"Exam with Id: {id} deleted successfully." });
+
         }
     }
 }
