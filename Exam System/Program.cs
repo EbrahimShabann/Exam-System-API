@@ -26,7 +26,7 @@ namespace Exam_System
                 options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
             }); 
             builder.Services.AddScoped<IDbInitializer,DbInitializer>();
-            builder.Services.AddScoped<IRepository<Exam>, Repository<Exam>>();
+            builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
             // Add and configure Swagger/OpenAPI
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen(options =>
