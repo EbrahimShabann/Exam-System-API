@@ -13,18 +13,20 @@ namespace Exam_System.Controllers
     [ApiController]
     public class ExamController : ControllerBase
     {
-        private readonly IRepository<Exam> examRepo;
+        
+        private readonly IUnitOfWork uof;
         private readonly UserManager<ApplicationUser> userManager;
 
-        public ExamController(IRepository<Exam> examRepo, UserManager<ApplicationUser> userManager)
+        public ExamController(IUnitOfWork uof, UserManager<ApplicationUser> userManager)
         {
-            this.examRepo = examRepo;
+          
+            this.uof = uof;
             this.userManager = userManager;
         }
         [HttpGet("GetAllExams")]
         public IActionResult GetExams()
         {
-            var exams = examRepo.GetAll().Select(e => new ExamDto
+            var exams = uof.ExamRepo.GetAll().Select(e => new ExamDto
             {
                 Id=e.Id,
                 Title=e.Title,
@@ -41,7 +43,7 @@ namespace Exam_System.Controllers
         [HttpGet("{id}")]
         public IActionResult GetExamById(int id)
         {
-            var exam = examRepo.GetById(id);
+            var exam = uof.ExamRepo.GetById(id);
             return exam != null ? Ok(exam) : NotFound($"Exam With Id: {id} Not Found ");
         }
 
@@ -68,8 +70,8 @@ namespace Exam_System.Controllers
 
             };
             
-            examRepo.Add(exam);
-            examRepo.Save();
+            uof.ExamRepo.Add(exam);
+            uof.Save();
             return CreatedAtAction(nameof(GetExamById), new { id = exam.Id }, exam);
         }
 
@@ -77,13 +79,13 @@ namespace Exam_System.Controllers
         [Authorize(Roles = "Teacher")]
         public IActionResult EditExam([FromBody]UpsertExamDTO updatedExam,[FromRoute] int id)
         {
-            var examFromDb = examRepo.GetById(id);
+            var examFromDb = uof.ExamRepo.GetById(id);
             if (examFromDb == null) return BadRequest();
             examFromDb.Title = updatedExam.Title;
             examFromDb.Description= updatedExam.Description;
             examFromDb.Duration= updatedExam.Duration;
-            examRepo.Update(examFromDb);
-            examRepo.Save();
+            uof.ExamRepo.Update(examFromDb);
+            uof.Save();
             return Ok(examFromDb);
 
         }
@@ -91,10 +93,10 @@ namespace Exam_System.Controllers
         [Authorize(Roles = "Teacher")]
         public IActionResult DeleteExam([FromRoute]int id)
         {
-            var examFromDb = examRepo.GetById(id);
+            var examFromDb = uof.ExamRepo.GetById(id);
             if (examFromDb == null) return NotFound(new { message = $"Exam with Id: {id} Not Found." });
-            examRepo.Delete(examFromDb);
-            examRepo.Save();
+            uof.ExamRepo.Delete(examFromDb);
+            uof.Save();
             return Ok(new { message = $"Exam with Id: {id} deleted successfully." });
 
         }
