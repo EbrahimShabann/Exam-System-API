@@ -48,7 +48,7 @@ namespace Exam_System.Controllers
         }
 
         [HttpPost]
-        [Authorize(Roles = "Teacher")] 
+        //[Authorize(Roles = "Teacher")]
         public IActionResult CreateExam(UpsertExamDTO examModel)
         {
             if (examModel == null)
@@ -59,18 +59,29 @@ namespace Exam_System.Controllers
             {
                 Console.WriteLine($"{claim.Type} => {claim.Value}");
             }
-
+            //create exam has  questions and choices for each question
             var exam = new Exam()
             {
                 Title = examModel.Title,
                 Description = examModel.Description,
-                ApplicationUserId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier).Value,
+                ApplicationUserId = "509f5459-2c9e-4623-a63b-42c69b9fb698", //User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier).Value,
                 CreatedAt = DateTime.Now,
                 Duration = examModel.Duration,
+                Questions = examModel.Questions.Select(q => new Question
+                {
+                    QuestionText = q.QuestionText,
+                    QuestionType = Enum.TryParse<QuestionType>(q.QuestionType, true, out var questionType) ? questionType : QuestionType.Text,
+                    CreatedAt = DateTime.Now,
+                    Choices = q.Choices.Select(c => new Choice
+                    {
+                        ChoiceText = c.ChoiceText,
+                        IsCorrect = c.IsCorrect
+                    }).ToList()
+                }).ToList()
 
             };
             
-            uof.ExamRepo.Add(exam);
+            uof.ExamRepo.Add(exam);  
             uof.Save();
             return CreatedAtAction(nameof(GetExamById), new { id = exam.Id }, exam);
         }
@@ -90,11 +101,15 @@ namespace Exam_System.Controllers
 
         }
         [HttpDelete("{id}")]
-        [Authorize(Roles = "Teacher")]
+        //[Authorize(Roles = "Teacher")]
         public IActionResult DeleteExam([FromRoute]int id)
         {
             var examFromDb = uof.ExamRepo.GetById(id);
             if (examFromDb == null) return NotFound(new { message = $"Exam with Id: {id} Not Found." });
+            var quesOfExam=uof.QuesRepo.GetAll().Where(q=>q.ExamId==id);
+            var choicesofQues= uof.ChoiceRepo.GetAll().Where(c=>quesOfExam.Select(q=>q.Id).ToList().Contains(c.QuestionId)); //get all choices related to the questions of the exam
+            uof.ChoiceRepo.RemoveRange(choicesofQues);
+            uof.QuesRepo.RemoveRange(quesOfExam);     //delete all questions related to the exam
             uof.ExamRepo.Delete(examFromDb);
             uof.Save();
             return Ok(new { message = $"Exam with Id: {id} deleted successfully." });

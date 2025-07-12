@@ -2,16 +2,13 @@
 
 namespace Exam_System.Services.DTOs
 {
-    public class UpsertQuesDto
+    public class UpsertQuesDtoWithExam
     {
-       
-
-        public int ExamId { get; set; }
 
         public string QuestionText { get; set; }
-
-
         public string QuestionType { get; set; }
+
+        public List<UpsertChoiceDtoWithQues> Choices { get; set; }
 
     }
 }

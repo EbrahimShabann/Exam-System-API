@@ -2,6 +2,7 @@
 using Exam_System.Services.DTOs;
 using Exam_System.Services.ReposService.IRepos;
 using Mapster;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,13 +18,14 @@ namespace Exam_System.Controllers
         {
             this.uof = uof;
         }
+        [Authorize(Roles = "Teacher")]
         [HttpPost("AddQues")]
-        public IActionResult AddQuestion([FromBody] UpsertQuesDto quesDto)
+        public IActionResult AddQuestion([FromBody] UpsertQuesDtoAlone quesDto)
         {
             if(quesDto == null | string.IsNullOrWhiteSpace(quesDto.QuestionText) || string.IsNullOrWhiteSpace(quesDto.QuestionType))
                 return BadRequest("Question data is required.");
             var examFromDb= uof.ExamRepo.GetById(quesDto.ExamId);
-           
+
             var NewQues = new Question
             {
                 QuestionText = quesDto.QuestionText,
@@ -39,9 +41,10 @@ namespace Exam_System.Controllers
 
 
         }
-  
+
+        [Authorize(Roles = "Teacher")]
         [HttpPost("AddChoice")]
-        public IActionResult AddChoice([FromBody] AddChoiceDto choiceDto)
+        public IActionResult AddChoice([FromBody] AddChoiceDtoAlone choiceDto)
         {
             if(choiceDto == null | string.IsNullOrWhiteSpace(choiceDto.ChoiceText) )
                 return BadRequest("choice data is required.");
@@ -59,8 +62,9 @@ namespace Exam_System.Controllers
 
         }
 
+        [Authorize(Roles = "Teacher")]
         [HttpPut ]
-        public IActionResult UpdateQuestion([FromBody] UpsertQuesDto quesDto, int id)
+        public IActionResult UpdateQuestion([FromBody] UpsertQuesDtoAlone quesDto, int id)
         {
             if (quesDto == null)
                 return BadRequest("Question data is required.");
@@ -85,6 +89,19 @@ namespace Exam_System.Controllers
             uof.QuesRepo.Update(quesFromDb);
             uof.Save();
             return Ok(quesFromDb);
+        }
+
+        
+        [Authorize(Roles = "Teacher")]
+        [HttpDelete("{id}")]
+        public IActionResult DeleteQuestion(int id)
+        {
+            var quesFromDb = uof.QuesRepo.GetById(id);
+            if (quesFromDb == null)
+                return NotFound($"Question with ID: {id} not found.");
+            uof.QuesRepo.Delete(quesFromDb);
+            uof.Save();
+            return Ok("Deleted Successfully"); // 204 No Content
         }
     }
 }
