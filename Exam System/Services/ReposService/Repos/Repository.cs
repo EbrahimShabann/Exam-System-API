@@ -30,7 +30,11 @@ namespace Exam_System.Services.ReposService.Repos
             return db.Set<T>().Find(id) ?? throw new KeyNotFoundException($"Entity of type {typeof(T).Name} with ID {id} not found.");
         }
 
-       
+        public void RemoveRange(IEnumerable<T> entities)
+        {
+           db.Set<T>().RemoveRange(entities);
+        }
+
         public void Update(T entity)
         {
             db.Set<T>().Update(entity);

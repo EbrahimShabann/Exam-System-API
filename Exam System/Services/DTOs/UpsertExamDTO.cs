@@ -10,10 +10,10 @@ namespace Exam_System.Services.DTOs
 
         public string Description { get; set; }
 
-        
+
         public int Duration { get; set; }
 
+        public  List<UpsertQuesDtoWithExam> Questions { get; set; } 
 
-       
     }
 }
