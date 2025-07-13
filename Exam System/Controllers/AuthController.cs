@@ -62,7 +62,7 @@ namespace Exam_System.Controllers
             var userRole = _userManager.GetRolesAsync(user).Result.FirstOrDefault();
             var token = GenerateJwtToken(user, userRole);
            
-            return Ok(new { token });
+            return Ok(new { token=token ,userRole=userRole});
         }
 
         private string GenerateJwtToken(ApplicationUser user,string userRole)

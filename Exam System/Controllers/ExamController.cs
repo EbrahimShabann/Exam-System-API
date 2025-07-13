@@ -1,6 +1,7 @@
 ﻿using Exam_System.Models;
 using Exam_System.Services.DTOs;
 using Exam_System.Services.ReposService.IRepos;
+using Mapster;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -44,10 +45,17 @@ namespace Exam_System.Controllers
         public IActionResult GetExamById(int id)
         {
             var exam = uof.ExamRepo.GetById(id);
-            return exam != null ? Ok(exam) : NotFound($"Exam With Id: {id} Not Found ");
+
+            var config = new TypeAdapterConfig();
+            config.NewConfig<Question, UpsertQuesDtoWithExam>()
+                  .Map(dest => dest.QuestionType, src => src.QuestionType.ToString());
+
+            var examDto = exam.Adapt<ExamDto>(config);
+
+            return examDto != null ? Ok(examDto) : NotFound($"Exam With Id: {id} Not Found ");
         }
 
-        [Authorize(Roles = "Teacher")]
+        //[Authorize(Roles = "Teacher")]
         [HttpPost]
         public IActionResult CreateExam(UpsertExamDTO examModel)
         {
@@ -64,7 +72,7 @@ namespace Exam_System.Controllers
             {
                 Title = examModel.Title,
                 Description = examModel.Description,
-                ApplicationUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
+                ApplicationUserId = "509f5459-2c9e-4623-a63b-42c69b9fb698", //User.FindFirstValue(ClaimTypes.NameIdentifier),
                 CreatedAt = DateTime.Now,
                 Duration = examModel.Duration,
                 Questions = examModel.Questions.Select(q => new Question
@@ -92,9 +100,26 @@ namespace Exam_System.Controllers
         {
             var examFromDb = uof.ExamRepo.GetById(id);
             if (examFromDb == null) return BadRequest();
+            //update exam fields
             examFromDb.Title = updatedExam.Title;
             examFromDb.Description= updatedExam.Description;
             examFromDb.Duration= updatedExam.Duration;
+            //remove old ques and choices
+            var choicesofQues = uof.ChoiceRepo.GetAll().Where(c => examFromDb.Questions.Select(q => q.Id).ToList().Contains(c.QuestionId));
+            uof.ChoiceRepo.RemoveRange(choicesofQues);
+            uof.QuesRepo.RemoveRange(examFromDb.Questions);
+            //update quess
+            examFromDb.Questions = updatedExam.Questions.Select(q => new Question
+            {
+                QuestionText = q.QuestionText,
+                QuestionType = Enum.TryParse<QuestionType>(q.QuestionType, true, out var questionType) ? questionType : QuestionType.Text,
+                Choices = q.Choices.Select(c => new Choice
+                {
+                    ChoiceText = c.ChoiceText,
+                    IsCorrect = c.IsCorrect
+                }).ToList()
+            }).ToList();
+
             uof.ExamRepo.Update(examFromDb);
             uof.Save();
             return Ok(examFromDb);
