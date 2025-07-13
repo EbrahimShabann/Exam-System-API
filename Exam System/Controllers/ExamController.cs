@@ -55,7 +55,7 @@ namespace Exam_System.Controllers
             return examDto != null ? Ok(examDto) : NotFound($"Exam With Id: {id} Not Found ");
         }
 
-        //[Authorize(Roles = "Teacher")]
+        [Authorize(Roles = "Teacher")]
         [HttpPost]
         public IActionResult CreateExam(UpsertExamDTO examModel)
         {
@@ -72,13 +72,13 @@ namespace Exam_System.Controllers
             {
                 Title = examModel.Title,
                 Description = examModel.Description,
-                ApplicationUserId = "509f5459-2c9e-4623-a63b-42c69b9fb698", //User.FindFirstValue(ClaimTypes.NameIdentifier),
+                ApplicationUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
                 CreatedAt = DateTime.Now,
                 Duration = examModel.Duration,
                 Questions = examModel.Questions.Select(q => new Question
                 {
                     QuestionText = q.QuestionText,
-                    QuestionType = Enum.TryParse<QuestionType>(q.QuestionType, true, out var questionType) ? questionType : QuestionType.Text,
+                    QuestionType = Enum.TryParse<QuestionType>(q.QuestionType, true, out var questionType) ? questionType : QuestionType.MCQ,
                     CreatedAt = DateTime.Now,
                     Choices = q.Choices.Select(c => new Choice
                     {
