@@ -183,6 +183,7 @@ namespace Exam_System.Controllers
             if (exam == null) return NotFound();
             var questions = exam.Questions.ToList();
             int correctCount = 0, totalMcq = 0;
+            var studentAnswers = new List<StudentAnswer>();
             foreach (var ans in dto.Answers)
             {
                 var question = questions.FirstOrDefault(q => q.Id == ans.QuestionId);
@@ -195,7 +196,7 @@ namespace Exam_System.Controllers
                     isCorrect = (ans.ChoiceId == correctChoice?.Id);
                     if (isCorrect == true) correctCount++;
                 }
-                uof.StudentAnswerRepo.Add(new StudentAnswer
+                var studentAnswer = new StudentAnswer
                 {
                     ApplicationUserId = studentId,
                     ExamId = id,
@@ -204,7 +205,9 @@ namespace Exam_System.Controllers
                     TextAnswer = ans.TextAnswer,
                     IsCorrect = isCorrect,
                     AnsweredAt = DateTime.UtcNow
-                });
+                };
+                studentAnswers.Add(studentAnswer);
+                uof.StudentAnswerRepo.Add(studentAnswer);
             }
             double score = totalMcq > 0 ? (double)correctCount / totalMcq * 100 : 0;
             uof.ResultRepo.Add(new Result
@@ -215,7 +218,19 @@ namespace Exam_System.Controllers
                 SubmittedAt = DateTime.UtcNow
             });
             uof.Save();
-            return Ok(new { score });
+
+            // Build review structure
+            var review = questions.Select(q => new {
+                id = q.Id,
+                text = q.QuestionText,
+                type = q.QuestionType.ToString(),
+                choices = q.QuestionType == QuestionType.MCQ ? q.Choices.Select(c => new { id = c.Id, text = c.ChoiceText }) : null,
+                correctChoiceId = q.QuestionType == QuestionType.MCQ ? q.Choices.FirstOrDefault(c => c.IsCorrect)?.Id : null,
+                selectedChoiceId = q.QuestionType == QuestionType.MCQ ? studentAnswers.FirstOrDefault(a => a.QuestionId == q.Id)?.ChoiceId : null,
+                userTextAnswer = q.QuestionType == QuestionType.Text ? studentAnswers.FirstOrDefault(a => a.QuestionId == q.Id)?.TextAnswer : null
+            }).ToList();
+
+            return Ok(new { score, questions = review });
         }
 
         [Authorize(Roles = "Student")]

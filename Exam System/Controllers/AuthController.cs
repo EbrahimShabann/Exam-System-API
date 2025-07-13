@@ -97,7 +97,9 @@ namespace Exam_System.Controllers
             if (userId == null) return Unauthorized();
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null) return NotFound();
-            return Ok(new { username = user.UserName });
+            var roles = await _userManager.GetRolesAsync(user);
+            var role = roles.FirstOrDefault();
+            return Ok(new { username = user.UserName, role });
         }
     }
 }
