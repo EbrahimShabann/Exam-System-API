@@ -125,8 +125,8 @@ namespace Exam_System
                 app.UseSwagger();
                 app.UseSwaggerUI(options =>
                 {
-                    options.SwaggerEndpoint("/openapi/v1.json", "v1");
-                    //options.SwaggerEndpoint("/swagger/v1/swagger.json", "v1");
+                    //options.SwaggerEndpoint("/openapi/v1.json", "v1");
+                    options.SwaggerEndpoint("/swagger/v1/swagger.json", "v1");
 
                 });
 
