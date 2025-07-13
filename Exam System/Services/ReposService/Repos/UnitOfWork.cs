@@ -10,6 +10,8 @@ namespace Exam_System.Services.ReposService.Repos
         IRepository<Exam> examRepo;
         IRepository<Question> quesRepo;
         IRepository<Choice> choiceRepo;
+        IRepository<StudentAnswer> studentAnswerRepo;
+        IRepository<Result> resultRepo;
         public UnitOfWork(AppDbContext db)
         {
             this.db = db;
@@ -42,6 +44,25 @@ namespace Exam_System.Services.ReposService.Repos
                 if (choiceRepo != null) return choiceRepo;
                 choiceRepo = new Repository<Choice>(db);
                 return choiceRepo;
+            }
+        }
+
+        public IRepository<StudentAnswer> StudentAnswerRepo
+        {
+            get
+            {
+                if (studentAnswerRepo != null) return studentAnswerRepo;
+                studentAnswerRepo = new Repository<StudentAnswer>(db);
+                return studentAnswerRepo;
+            }
+        }
+        public IRepository<Result> ResultRepo
+        {
+            get
+            {
+                if (resultRepo != null) return resultRepo;
+                resultRepo = new Repository<Result>(db);
+                return resultRepo;
             }
         }
 

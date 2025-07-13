@@ -78,6 +78,14 @@ namespace Exam_System
                     .AllowAnyOrigin()
                     .AllowAnyMethod()
                     .AllowAnyHeader());
+
+                // Add CORS policy for Angular frontend
+                options.AddPolicy("AllowAngular",
+                    builder => builder
+                        .WithOrigins("http://localhost:4200")
+                        .AllowAnyHeader()
+                        .AllowAnyMethod()
+                        .AllowCredentials());
             });
             // Configure JWT Authentication
             var jwtKey = builder.Configuration["Jwt:Key"];
@@ -119,6 +127,7 @@ namespace Exam_System
                 {
                     options.SwaggerEndpoint("/openapi/v1.json", "v1");
                     //options.SwaggerEndpoint("/swagger/v1/swagger.json", "v1");
+
                 });
 
 
@@ -126,9 +135,11 @@ namespace Exam_System
 
             app.UseHttpsRedirection();
 
+            // CORS must be before UseAuthorization and MapControllers
+            app.UseCors("AllowAngular");
+
             app.UseAuthentication();
             app.UseAuthorization();
-            app.UseCors(txt);
             app.MapControllers();
 
             app.Run();
