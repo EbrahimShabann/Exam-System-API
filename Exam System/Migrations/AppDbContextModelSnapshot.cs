@@ -17,7 +17,7 @@ namespace Exam_System.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.6")
+                .HasAnnotation("ProductVersion", "9.0.7")
                 .HasAnnotation("Proxies:ChangeTracking", false)
                 .HasAnnotation("Proxies:CheckEquality", false)
                 .HasAnnotation("Proxies:LazyLoading", true)
@@ -403,7 +403,7 @@ namespace Exam_System.Migrations
             modelBuilder.Entity("Exam_System.Models.Choice", b =>
                 {
                     b.HasOne("Exam_System.Models.Question", "Question")
-                        .WithMany()
+                        .WithMany("Choices")
                         .HasForeignKey("QuestionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -414,7 +414,7 @@ namespace Exam_System.Migrations
             modelBuilder.Entity("Exam_System.Models.Exam", b =>
                 {
                     b.HasOne("Exam_System.Models.ApplicationUser", "Teacher")
-                        .WithMany()
+                        .WithMany("Exams")
                         .HasForeignKey("ApplicationUserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -425,7 +425,7 @@ namespace Exam_System.Migrations
             modelBuilder.Entity("Exam_System.Models.Question", b =>
                 {
                     b.HasOne("Exam_System.Models.Exam", "Exam")
-                        .WithMany()
+                        .WithMany("Questions")
                         .HasForeignKey("ExamId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -436,13 +436,13 @@ namespace Exam_System.Migrations
             modelBuilder.Entity("Exam_System.Models.Result", b =>
                 {
                     b.HasOne("Exam_System.Models.ApplicationUser", "User")
-                        .WithMany()
+                        .WithMany("Results")
                         .HasForeignKey("ApplicationUserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("Exam_System.Models.Exam", "Exam")
-                        .WithMany()
+                        .WithMany("Results")
                         .HasForeignKey("ExamId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -534,6 +534,25 @@ namespace Exam_System.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Exam_System.Models.ApplicationUser", b =>
+                {
+                    b.Navigation("Exams");
+
+                    b.Navigation("Results");
+                });
+
+            modelBuilder.Entity("Exam_System.Models.Exam", b =>
+                {
+                    b.Navigation("Questions");
+
+                    b.Navigation("Results");
+                });
+
+            modelBuilder.Entity("Exam_System.Models.Question", b =>
+                {
+                    b.Navigation("Choices");
                 });
 #pragma warning restore 612, 618
         }
