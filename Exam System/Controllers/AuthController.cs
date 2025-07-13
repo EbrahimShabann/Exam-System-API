@@ -88,5 +88,16 @@ namespace Exam_System.Controllers
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
+
+        [Authorize]
+        [HttpGet("me/username")]
+        public async Task<IActionResult> GetLoggedInUsername()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userId == null) return Unauthorized();
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null) return NotFound();
+            return Ok(new { username = user.UserName });
+        }
     }
 }

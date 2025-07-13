@@ -47,8 +47,8 @@ namespace Exam_System.Controllers
             return exam != null ? Ok(exam) : NotFound($"Exam With Id: {id} Not Found ");
         }
 
+        [Authorize(Roles = "Teacher")]
         [HttpPost]
-        //[Authorize(Roles = "Teacher")]
         public IActionResult CreateExam(UpsertExamDTO examModel)
         {
             if (examModel == null)
@@ -64,7 +64,7 @@ namespace Exam_System.Controllers
             {
                 Title = examModel.Title,
                 Description = examModel.Description,
-                ApplicationUserId = "509f5459-2c9e-4623-a63b-42c69b9fb698", //User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier).Value,
+                ApplicationUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
                 CreatedAt = DateTime.Now,
                 Duration = examModel.Duration,
                 Questions = examModel.Questions.Select(q => new Question
@@ -101,19 +101,139 @@ namespace Exam_System.Controllers
 
         }
         [HttpDelete("{id}")]
-        //[Authorize(Roles = "Teacher")]
+        [Authorize(Roles = "Teacher")]
         public IActionResult DeleteExam([FromRoute]int id)
         {
             var examFromDb = uof.ExamRepo.GetById(id);
             if (examFromDb == null) return NotFound(new { message = $"Exam with Id: {id} Not Found." });
-            var quesOfExam=uof.QuesRepo.GetAll().Where(q=>q.ExamId==id);
-            var choicesofQues= uof.ChoiceRepo.GetAll().Where(c=>quesOfExam.Select(q=>q.Id).ToList().Contains(c.QuestionId)); //get all choices related to the questions of the exam
+            // Remove all student answers for this exam
+            var studentAnswers = uof.StudentAnswerRepo.GetAll().Where(sa => sa.ExamId == id).ToList();
+            uof.StudentAnswerRepo.RemoveRange(studentAnswers);
+            // Remove all results for this exam
+            var results = uof.ResultRepo.GetAll().Where(r => r.ExamId == id).ToList();
+            uof.ResultRepo.RemoveRange(results);
+            // Remove all choices and questions for this exam
+            var quesOfExam = uof.QuesRepo.GetAll().Where(q => q.ExamId == id);
+            var choicesofQues = uof.ChoiceRepo.GetAll().Where(c => quesOfExam.Select(q => q.Id).ToList().Contains(c.QuestionId));
             uof.ChoiceRepo.RemoveRange(choicesofQues);
-            uof.QuesRepo.RemoveRange(quesOfExam);     //delete all questions related to the exam
+            uof.QuesRepo.RemoveRange(quesOfExam);
             uof.ExamRepo.Delete(examFromDb);
             uof.Save();
             return Ok(new { message = $"Exam with Id: {id} deleted successfully." });
 
+        }
+
+        [Authorize(Roles = "Student")]
+        [HttpGet("available")]
+        public IActionResult GetAvailableExams(string? search = null, int page = 1, int pageSize = 10)
+        {
+            var studentId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var examsQuery = uof.ExamRepo.GetAll()
+                .Where(e => !e.Results.Any(r => r.ApplicationUserId == studentId));
+            if (!string.IsNullOrWhiteSpace(search))
+                examsQuery = examsQuery.Where(e => e.Title.Contains(search));
+            var total = examsQuery.Count();
+            var exams = examsQuery
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(e => new { e.Id, e.Title, e.Description })
+                .ToList();
+            return Ok(new { total, exams });
+        }
+
+        [Authorize(Roles = "Student")]
+        [HttpGet("{id}/questions")]
+        public IActionResult GetExamQuestions(int id)
+        {
+            var exam = uof.ExamRepo.GetAll()
+                .Where(e => e.Id == id)
+                .Select(e => new {
+                    e.Id,
+                    Questions = e.Questions.Select(q => new {
+                        q.Id,
+                        q.QuestionText,
+                        q.QuestionType,
+                        Choices = q.QuestionType == QuestionType.MCQ
+                            ? q.Choices.Select(c => new { c.Id, c.ChoiceText })
+                            : null
+                    })
+                })
+                .FirstOrDefault();
+            if (exam == null) return NotFound();
+            return Ok(exam.Questions);
+        }
+
+        public class SubmitExamDto
+        {
+            public List<SubmitAnswerDto> Answers { get; set; }
+        }
+        public class SubmitAnswerDto
+        {
+            public int QuestionId { get; set; }
+            public int? ChoiceId { get; set; }
+            public string? TextAnswer { get; set; }
+        }
+
+        [Authorize(Roles = "Student")]
+        [HttpPost("{id}/submit")]
+        public IActionResult SubmitExam(int id, [FromBody] SubmitExamDto dto)
+        {
+            var studentId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var exam = uof.ExamRepo.GetAll().FirstOrDefault(e => e.Id == id);
+            if (exam == null) return NotFound();
+            var questions = exam.Questions.ToList();
+            int correctCount = 0, totalMcq = 0;
+            foreach (var ans in dto.Answers)
+            {
+                var question = questions.FirstOrDefault(q => q.Id == ans.QuestionId);
+                if (question == null) continue;
+                bool? isCorrect = null;
+                if (question.QuestionType == QuestionType.MCQ && ans.ChoiceId.HasValue)
+                {
+                    totalMcq++;
+                    var correctChoice = question.Choices.FirstOrDefault(c => c.IsCorrect);
+                    isCorrect = (ans.ChoiceId == correctChoice?.Id);
+                    if (isCorrect == true) correctCount++;
+                }
+                uof.StudentAnswerRepo.Add(new StudentAnswer
+                {
+                    ApplicationUserId = studentId,
+                    ExamId = id,
+                    QuestionId = ans.QuestionId,
+                    ChoiceId = ans.ChoiceId,
+                    TextAnswer = ans.TextAnswer,
+                    IsCorrect = isCorrect,
+                    AnsweredAt = DateTime.UtcNow
+                });
+            }
+            double score = totalMcq > 0 ? (double)correctCount / totalMcq * 100 : 0;
+            uof.ResultRepo.Add(new Result
+            {
+                ApplicationUserId = studentId,
+                ExamId = id,
+                Degree = (float)score,
+                SubmittedAt = DateTime.UtcNow
+            });
+            uof.Save();
+            return Ok(new { score });
+        }
+
+        [Authorize(Roles = "Student")]
+        [HttpGet("results")]
+        public IActionResult GetStudentResults()
+        {
+            var studentId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var results = uof.ResultRepo.GetAll()
+                .Where(r => r.ApplicationUserId == studentId)
+                .Select(r => new {
+                    r.Id,
+                    r.ExamId,
+                    ExamTitle = r.Exam.Title,
+                    r.Degree,
+                    r.SubmittedAt
+                })
+                .ToList();
+            return Ok(results);
         }
     }
 }
