@@ -63,11 +63,8 @@ namespace Exam_System.Controllers
             {
                 return BadRequest("Exam cannot be null.");
             }
-            foreach (var claim in User.Claims)
-            {
-                Console.WriteLine($"{claim.Type} => {claim.Value}");
-            }
-            //create exam has  questions and choices for each question
+
+            // Create exam with questions and choices for each question
             var exam = new Exam()
             {
                 Title = examModel.Title,
@@ -75,21 +72,53 @@ namespace Exam_System.Controllers
                 ApplicationUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
                 CreatedAt = DateTime.Now,
                 Duration = examModel.Duration,
-                Questions = examModel.Questions.Select(q => new Question
-                {
-                    QuestionText = q.QuestionText,
-                    QuestionType = Enum.TryParse<QuestionType>(q.QuestionType, true, out var questionType) ? questionType : QuestionType.MCQ,
-                    CreatedAt = DateTime.Now,
-                    Choices = q.Choices.Select(c => new Choice
-                    {
-                        ChoiceText = c.ChoiceText,
-                        IsCorrect = c.IsCorrect
-                    }).ToList()
-                }).ToList()
+                Questions = examModel.Questions.Select(q => {
+                    var questionType = Enum.TryParse<QuestionType>(q.QuestionType, true, out var qt)
+                        ? qt
+                        : QuestionType.Text;
 
+                    var question = new Question
+                    {
+                        QuestionText = q.QuestionText,
+                        QuestionType = questionType,
+                        CreatedAt = DateTime.Now,
+                        Choices = new List<Choice>()
+                    };
+
+                    // Handle different question types
+                    if (questionType == QuestionType.TF)
+                    {
+                        // For TF questions, always create both True and False choices
+                        // Set IsCorrect based on TFCorrectAnswer if provided, otherwise default to True being correct
+                        bool correctAnswer = q.TFCorrectAnswer ?? true;
+
+                        question.Choices.Add(new Choice
+                        {
+                            ChoiceText = "True",
+                            IsCorrect = correctAnswer
+                        });
+                        question.Choices.Add(new Choice
+                        {
+                            ChoiceText = "False",
+                            IsCorrect = !correctAnswer
+                        });
+                    }
+                    else if (questionType == QuestionType.MCQ)
+                    {
+                        // For MCQ questions, use the provided choices
+                        question.Choices = q.Choices?.Select(c => new Choice
+                        {
+                            ChoiceText = c.ChoiceText,
+                            IsCorrect = c.IsCorrect
+                        }).ToList() ?? new List<Choice>();
+                    }
+                    // Text questions don't need choices
+
+                    return question;
+                }).ToList()
             };
-            
-            uof.ExamRepo.Add(exam);  
+
+            uof.ExamRepo.Add(exam);
             uof.Save();
             return CreatedAtAction(nameof(GetExamById), new { id = exam.Id }, exam);
         }
@@ -178,7 +207,7 @@ namespace Exam_System.Controllers
                         q.Id,
                         q.QuestionText,
                         q.QuestionType,
-                        Choices = q.QuestionType == QuestionType.MCQ
+                        Choices = (q.QuestionType == QuestionType.MCQ || q.QuestionType == QuestionType.TF)
                             ? q.Choices.Select(c => new { c.Id, c.ChoiceText })
                             : null
                     })
@@ -186,17 +215,6 @@ namespace Exam_System.Controllers
                 .FirstOrDefault();
             if (exam == null) return NotFound();
             return Ok(exam.Questions);
-        }
-
-        public class SubmitExamDto
-        {
-            public List<SubmitAnswerDto> Answers { get; set; }
-        }
-        public class SubmitAnswerDto
-        {
-            public int QuestionId { get; set; }
-            public int? ChoiceId { get; set; }
-            public string? TextAnswer { get; set; }
         }
 
         [Authorize(Roles = "Student")]
@@ -207,26 +225,59 @@ namespace Exam_System.Controllers
             var exam = uof.ExamRepo.GetAll().FirstOrDefault(e => e.Id == id);
             if (exam == null) return NotFound();
             var questions = exam.Questions.ToList();
-            int correctCount = 0, totalMcq = 0;
+            int correctCount = 0, totalMcqTf = 0;
             var studentAnswers = new List<StudentAnswer>();
+
             foreach (var ans in dto.Answers)
             {
                 var question = questions.FirstOrDefault(q => q.Id == ans.QuestionId);
                 if (question == null) continue;
+
                 bool? isCorrect = null;
+                int? selectedChoiceId = null;
+                string selectedChoiceText = null;
+
                 if (question.QuestionType == QuestionType.MCQ && ans.ChoiceId.HasValue)
                 {
-                    totalMcq++;
+                    totalMcqTf++;
                     var correctChoice = question.Choices.FirstOrDefault(c => c.IsCorrect);
+                    selectedChoiceId = ans.ChoiceId;
+                    selectedChoiceText = question.Choices.FirstOrDefault(c => c.Id == ans.ChoiceId)?.ChoiceText;
                     isCorrect = (ans.ChoiceId == correctChoice?.Id);
                     if (isCorrect == true) correctCount++;
                 }
+                else if (question.QuestionType == QuestionType.TF)
+                {
+                    totalMcqTf++;
+                    var correctChoice = question.Choices.FirstOrDefault(c => c.IsCorrect);
+
+                    // Find both True and False choices
+                    var trueChoice = question.Choices.FirstOrDefault(c => c.ChoiceText.Equals("True", StringComparison.OrdinalIgnoreCase));
+                    var falseChoice = question.Choices.FirstOrDefault(c => c.ChoiceText.Equals("False", StringComparison.OrdinalIgnoreCase));
+
+                    // Determine which choice was selected
+                    if (ans.ChoiceId.HasValue)
+                    {
+                        var selectedChoice = question.Choices.FirstOrDefault(c => c.Id == ans.ChoiceId);
+                        selectedChoiceText = selectedChoice?.ChoiceText;
+                        selectedChoiceId = ans.ChoiceId;
+                        isCorrect = selectedChoice?.IsCorrect;
+                    }
+
+                    if (isCorrect == true) correctCount++;
+                }
+                else if (question.QuestionType == QuestionType.Text)
+                {
+                    // Text questions are not graded automatically
+                    isCorrect = null;
+                }
+
                 var studentAnswer = new StudentAnswer
                 {
                     ApplicationUserId = studentId,
                     ExamId = id,
                     QuestionId = ans.QuestionId,
-                    ChoiceId = ans.ChoiceId,
+                    ChoiceId = selectedChoiceId,
                     TextAnswer = ans.TextAnswer,
                     IsCorrect = isCorrect,
                     AnsweredAt = DateTime.UtcNow
@@ -234,7 +285,8 @@ namespace Exam_System.Controllers
                 studentAnswers.Add(studentAnswer);
                 uof.StudentAnswerRepo.Add(studentAnswer);
             }
-            double score = totalMcq > 0 ? (double)correctCount / totalMcq * 100 : 0;
+
+            double score = totalMcqTf > 0 ? (double)correctCount / totalMcqTf * 100 : 0;
             uof.ResultRepo.Add(new Result
             {
                 ApplicationUserId = studentId,
@@ -245,18 +297,69 @@ namespace Exam_System.Controllers
             uof.Save();
 
             // Build review structure
-            var review = questions.Select(q => new {
-                id = q.Id,
-                text = q.QuestionText,
-                type = q.QuestionType.ToString(),
-                choices = q.QuestionType == QuestionType.MCQ ? q.Choices.Select(c => new { id = c.Id, text = c.ChoiceText }) : null,
-                correctChoiceId = q.QuestionType == QuestionType.MCQ ? q.Choices.FirstOrDefault(c => c.IsCorrect)?.Id : null,
-                selectedChoiceId = q.QuestionType == QuestionType.MCQ ? studentAnswers.FirstOrDefault(a => a.QuestionId == q.Id)?.ChoiceId : null,
-                userTextAnswer = q.QuestionType == QuestionType.Text ? studentAnswers.FirstOrDefault(a => a.QuestionId == q.Id)?.TextAnswer : null
+            var review = questions.Select(q => {
+                var studentAnswer = studentAnswers.FirstOrDefault(a => a.QuestionId == q.Id);
+                var correctChoice = (q.QuestionType == QuestionType.MCQ || q.QuestionType == QuestionType.TF)
+                    ? q.Choices.FirstOrDefault(c => c.IsCorrect)
+                    : null;
+                var selectedChoice = studentAnswer?.ChoiceId.HasValue == true
+                    ? q.Choices.FirstOrDefault(c => c.Id == studentAnswer.ChoiceId)
+                    : null;
+
+                // TF logic
+                bool? userTFAnswer = null;
+                bool? correctTFAnswer = null;
+                if (q.QuestionType == QuestionType.TF)
+                {
+                    // userTFAnswer: what the user selected (true/false)
+                    if (selectedChoice != null)
+                        userTFAnswer = selectedChoice.ChoiceText.Equals("True", StringComparison.OrdinalIgnoreCase);
+                    // correctTFAnswer: what is correct (true/false)
+                    if (correctChoice != null)
+                        correctTFAnswer = correctChoice.ChoiceText.Equals("True", StringComparison.OrdinalIgnoreCase);
+                }
+
+                // MCQ logic
+                int? selectedChoiceId = null;
+                int? correctChoiceId = null;
+                if (q.QuestionType == QuestionType.MCQ)
+                {
+                    selectedChoiceId = selectedChoice?.Id;
+                    correctChoiceId = correctChoice?.Id;
+                }
+
+                // Text logic
+                string userTextAnswer = null;
+                string correctTextAnswer = null; // Only if you store correct answers for text
+                if (q.QuestionType == QuestionType.Text)
+                {
+                    userTextAnswer = studentAnswer?.TextAnswer;
+                }
+
+                return new
+                {
+                    id = q.Id,
+                    text = q.QuestionText,
+                    type = q.QuestionType.ToString(),
+                    // MCQ/TF choices
+                    choices = (q.QuestionType == QuestionType.MCQ || q.QuestionType == QuestionType.TF)
+                        ? q.Choices.Select(c => new { id = c.Id, text = c.ChoiceText })
+                        : null,
+                    // MCQ
+                    selectedChoiceId,
+                    correctChoiceId,
+                    // TF
+                    userTFAnswer,
+                    correctTFAnswer,
+                    // Text
+                    userTextAnswer,
+                    correctTextAnswer
+                };
             }).ToList();
 
             return Ok(new { score, questions = review });
         }
+
 
         [Authorize(Roles = "Student")]
         [HttpGet("results")]

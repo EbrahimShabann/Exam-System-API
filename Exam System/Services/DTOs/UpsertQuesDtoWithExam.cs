@@ -9,8 +9,7 @@ namespace Exam_System.Services.DTOs
 
         [JsonPropertyName("questionType")]
         public string QuestionType { get; set; }
-
-        [JsonPropertyName("choices")]
+        public bool? TFCorrectAnswer { get; set; } // True = True is correct, False = False is correct
         public List<UpsertChoiceDtoWithQues> Choices { get; set; }
 
     }
