@@ -21,5 +21,17 @@ namespace Exam_System.Services.DTOs
         public virtual List<Result> Results { get; set; } = [];
        
     }
+
+    public class SubmitExamDto
+    {
+        public List<SubmitAnswerDto> Answers { get; set; }
+    }
+    public class SubmitAnswerDto
+    {
+        public int QuestionId { get; set; }
+        public int? ChoiceId { get; set; }
+        public string? TextAnswer { get; set; }
+        public bool? BoolAnswer { get; set; } // for TF questions
+    }
 }
 

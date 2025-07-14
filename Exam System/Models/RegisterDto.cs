@@ -1,6 +1,8 @@
-public class RegisterDto
+namespace Exam_System.Services.DTOs
 {
-    public string Email { get; set; }
-    public string Password { get; set; }
-  
+    public class RegisterDto
+    {
+        public string Email { get; set; }
+        public string Password { get; set; }
+    }
 }
