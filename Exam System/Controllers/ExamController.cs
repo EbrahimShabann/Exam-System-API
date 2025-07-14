@@ -1,6 +1,7 @@
 ﻿using Exam_System.Models;
 using Exam_System.Services.DTOs;
 using Exam_System.Services.ReposService.IRepos;
+using Mapster;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -44,7 +45,14 @@ namespace Exam_System.Controllers
         public IActionResult GetExamById(int id)
         {
             var exam = uof.ExamRepo.GetById(id);
-            return exam != null ? Ok(exam) : NotFound($"Exam With Id: {id} Not Found ");
+
+            var config = new TypeAdapterConfig();
+            config.NewConfig<Question, UpsertQuesDtoWithExam>()
+                  .Map(dest => dest.QuestionType, src => src.QuestionType.ToString());
+
+            var examDto = exam.Adapt<ExamDto>(config);
+
+            return examDto != null ? Ok(examDto) : NotFound($"Exam With Id: {id} Not Found ");
         }
 
         [Authorize(Roles = "Teacher")]
@@ -121,9 +129,26 @@ namespace Exam_System.Controllers
         {
             var examFromDb = uof.ExamRepo.GetById(id);
             if (examFromDb == null) return BadRequest();
+            //update exam fields
             examFromDb.Title = updatedExam.Title;
             examFromDb.Description= updatedExam.Description;
             examFromDb.Duration= updatedExam.Duration;
+            //remove old ques and choices
+            var choicesofQues = uof.ChoiceRepo.GetAll().Where(c => examFromDb.Questions.Select(q => q.Id).ToList().Contains(c.QuestionId));
+            uof.ChoiceRepo.RemoveRange(choicesofQues);
+            uof.QuesRepo.RemoveRange(examFromDb.Questions);
+            //update quess
+            examFromDb.Questions = updatedExam.Questions.Select(q => new Question
+            {
+                QuestionText = q.QuestionText,
+                QuestionType = Enum.TryParse<QuestionType>(q.QuestionType, true, out var questionType) ? questionType : QuestionType.Text,
+                Choices = q.Choices.Select(c => new Choice
+                {
+                    ChoiceText = c.ChoiceText,
+                    IsCorrect = c.IsCorrect
+                }).ToList()
+            }).ToList();
+
             uof.ExamRepo.Update(examFromDb);
             uof.Save();
             return Ok(examFromDb);
@@ -152,7 +177,7 @@ namespace Exam_System.Controllers
 
         }
 
-        [Authorize(Roles = "Student")]
+        [Authorize(Roles = "Student , Teacher")]
         [HttpGet("available")]
         public IActionResult GetAvailableExams(string? search = null, int page = 1, int pageSize = 10)
         {
@@ -170,7 +195,7 @@ namespace Exam_System.Controllers
             return Ok(new { total, exams });
         }
 
-        [Authorize(Roles = "Student")]
+        [Authorize(Roles = "Student , Teacher")]
         [HttpGet("{id}/questions")]
         public IActionResult GetExamQuestions(int id)
         {

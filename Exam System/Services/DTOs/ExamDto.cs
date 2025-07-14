@@ -17,7 +17,7 @@ namespace Exam_System.Services.DTOs
         
         public string CreatedBy { get; set; }
 
-        public virtual List<Question> Questions { get; set; } = [];
+        public virtual List<UpsertQuesDtoWithExam> Questions { get; set; } = [];
         public virtual List<Result> Results { get; set; } = [];
        
     }

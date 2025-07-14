@@ -37,7 +37,7 @@ namespace Exam_System.Controllers
         {
             //students only register 
             var user = new ApplicationUser { UserName = model.Email, Email = model.Email, CreatedAt = DateTime.UtcNow };
-
+            user.EmailConfirmed = true; // Assuming email confirmation is not required for simplicity
             var result = await _userManager.CreateAsync(user, model.Password);
 
 
@@ -45,7 +45,7 @@ namespace Exam_System.Controllers
                 return BadRequest(result.Errors);
             else
                 await _userManager.AddToRoleAsync(user, StaticDetails.StudentRole);
-                return Ok("Registration successful");
+            return Ok(new { Message = "User registered successfully" }); // ? JSON
         }
 
         [HttpPost("login")]
@@ -63,7 +63,7 @@ namespace Exam_System.Controllers
             var userRole = _userManager.GetRolesAsync(user).Result.FirstOrDefault();
             var token = GenerateJwtToken(user, userRole);
            
-            return Ok(new { token });
+            return Ok(new { token=token ,userRole=userRole});
         }
 
         private string GenerateJwtToken(ApplicationUser user,string userRole)
