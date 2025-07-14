@@ -148,7 +148,7 @@ namespace Exam_System.Controllers
 
         }
 
-        [Authorize(Roles = "Student")]
+        [Authorize(Roles = "Student , Teacher")]
         [HttpGet("available")]
         public IActionResult GetAvailableExams(string? search = null, int page = 1, int pageSize = 10)
         {
@@ -166,7 +166,7 @@ namespace Exam_System.Controllers
             return Ok(new { total, exams });
         }
 
-        [Authorize(Roles = "Student")]
+        [Authorize(Roles = "Student , Teacher")]
         [HttpGet("{id}/questions")]
         public IActionResult GetExamQuestions(int id)
         {

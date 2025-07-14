@@ -36,7 +36,7 @@ namespace Exam_System.Controllers
         {
             //students only register 
             var user = new ApplicationUser { UserName = model.Email, Email = model.Email, CreatedAt = DateTime.UtcNow };
-
+            user.EmailConfirmed = true; // Assuming email confirmation is not required for simplicity
             var result = await _userManager.CreateAsync(user, model.Password);
 
 
@@ -44,7 +44,7 @@ namespace Exam_System.Controllers
                 return BadRequest(result.Errors);
             else
                 await _userManager.AddToRoleAsync(user, StaticDetails.StudentRole);
-                return Ok("Registration successful");
+            return Ok(new { Message = "User registered successfully" }); // ? JSON
         }
 
         [HttpPost("login")]
