@@ -7,20 +7,21 @@ EXPOSE 80
 FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
 WORKDIR /src
 
-# 1. نسخ ملف المشروع فقط
-COPY "Exam System.csproj" ./
+# Copy the project file first (note the correct path and name)
+COPY ["ExamSystem.csproj", "./"]
 
-# 2. استعادة الحزم
-RUN dotnet restore
+# Restore dependencies
+RUN dotnet restore "ExamSystem.csproj"
 
-# 3. نسخ باقي الملفات
-COPY . ./
+# Copy the remaining source code
+COPY . .
 
-# 4. نشر المشروع
-RUN dotnet publish -c Release -o /app/publish
+# Build and publish
+RUN dotnet build "ExamSystem.csproj" -c Release --no-restore
+RUN dotnet publish "ExamSystem.csproj" -c Release -o /app/publish --no-restore
 
 # Final image
 FROM base AS final
 WORKDIR /app
 COPY --from=build /app/publish .
-ENTRYPOINT ["dotnet", "Exam System.dll"]
+ENTRYPOINT ["dotnet", "ExamSystem.dll"]

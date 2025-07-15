@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36127.28 d17.14
+VisualStudioVersion = 17.14.36127.28
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Exam System", "Exam System\Exam System.csproj", "{7C47BFE5-DCBD-4D2A-8CCC-C6827CAB9A41}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExamSystem", "Exam System\ExamSystem.csproj", "{7C47BFE5-DCBD-4D2A-8CCC-C6827CAB9A41}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
