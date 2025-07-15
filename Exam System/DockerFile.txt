@@ -1,0 +1,26 @@
+# ===== Base image for runtime =====
+FROM mcr.microsoft.com/dotnet/aspnet:7.0 AS base
+WORKDIR /app
+EXPOSE 80
+
+# ===== Image for build =====
+FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
+WORKDIR /src
+
+# 1. نسخ فقط ملف .csproj
+COPY *.csproj ./
+
+# 2. استرجاع الحزم
+RUN dotnet restore
+
+# 3. نسخ باقي ملفات المشروع
+COPY . ./
+
+# 4. بناء المشروع للنشر
+RUN dotnet publish -c Release -o /app/publish
+
+# ===== Final image =====
+FROM base AS final
+WORKDIR /app
+COPY --from=build /app/publish .
+ENTRYPOINT ["dotnet", "Exam System.dll"]
