@@ -76,6 +76,7 @@ namespace Exam_System.Controllers
             {
                 Title = examModel.Title,
                 Description = examModel.Description,
+
                 ApplicationUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
                 CreatedAt = DateTime.Now,
                 Duration = examModel.Duration,

@@ -110,6 +110,7 @@ namespace Exam_System
                 };
                 options.MapInboundClaims = false; // Disable automatic mapping of claims coz it's mapping userName to name identifier
             });
+            builder.Services.AddAuthorization();
 
             var app = builder.Build();
 
@@ -146,3 +147,100 @@ namespace Exam_System
         }
     }
 }
+/*{
+    "title": "Programming Fundamentals Quiz",
+  "description": "Test your basic programming knowledge with 5 multiple-choice questions",
+  "duration": 15,
+  "questions": [
+    {
+        "questionText": "What does 'HTML' stand for?",
+      "questionType": "MCQ",
+      "choices": [
+        {
+            "choiceText": "Hyper Trainer Marking Language",
+          "isCorrect": false
+        },
+        {
+            "choiceText": "Hyper Text Markup Language",
+          "isCorrect": true
+        },
+        {
+            "choiceText": "Hyper Transfer Markup Language",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+        "questionText": "Which of these is NOT a programming paradigm?",
+      "questionType": "MCQ",
+      "choices": [
+        {
+            "choiceText": "Object-Oriented Programming",
+          "isCorrect": false
+        },
+        {
+            "choiceText": "Functional Programming",
+          "isCorrect": false
+        },
+        {
+            "choiceText": "Lateral Programming",
+          "isCorrect": true
+        }
+      ]
+    },
+    {
+        "questionText": "What will 'Boolean(0)' return in JavaScript?",
+      "questionType": "MCQ",
+      "choices": [
+        {
+            "choiceText": "true",
+          "isCorrect": false
+        },
+        {
+            "choiceText": "false",
+          "isCorrect": true
+        },
+        {
+            "choiceText": "undefined",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+        "questionText": "Which language uses 'print()' for console output?",
+      "questionType": "MCQ",
+      "choices": [
+        {
+            "choiceText": "Java",
+          "isCorrect": false
+        },
+        {
+            "choiceText": "Python",
+          "isCorrect": true
+        },
+        {
+            "choiceText": "C++",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+        "questionText": "What is the main purpose of CSS?",
+      "questionType": "MCQ",
+      "choices": [
+        {
+            "choiceText": "Adding interactivity to web pages",
+          "isCorrect": false
+        },
+        {
+            "choiceText": "Styling web page elements",
+          "isCorrect": true
+        },
+        {
+            "choiceText": "Creating database schemas",
+          "isCorrect": false
+        }
+      ]
+    }
+  ]
+}*/
