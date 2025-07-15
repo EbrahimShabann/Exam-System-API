@@ -1,14 +1,25 @@
+# Runtime base image
 FROM mcr.microsoft.com/dotnet/aspnet:7.0 AS base
 WORKDIR /app
 EXPOSE 80
 
+# Build image
 FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
 WORKDIR /src
-COPY *.csproj ./
+
+# 1. نسخ ملف المشروع فقط
+COPY ExamSystem.csproj ./
+
+# 2. استرجاع الحزم
 RUN dotnet restore
+
+# 3. نسخ باقي الملفات
 COPY . ./
+
+# 4. بناء المشروع
 RUN dotnet publish -c Release -o /app/publish
 
+# Final image
 FROM base AS final
 WORKDIR /app
 COPY --from=build /app/publish .
