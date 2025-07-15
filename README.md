@@ -40,3 +40,8 @@ This API is used by the Angular frontend hosted at:
 ### 📊 Results & Scoring
 - Auto-correction for multiple-choice questions
 
+## Angular UI Repo
+git clone https://github.com/EbrahimShabann/ExamSystemUI.git
+
+## API Repo
+git clone https://github.com/EbrahimShabann/Exam-System-API.git
