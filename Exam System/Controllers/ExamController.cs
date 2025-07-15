@@ -45,14 +45,21 @@ namespace Exam_System.Controllers
         public IActionResult GetExamById(int id)
         {
             var exam = uof.ExamRepo.GetById(id);
-
-            var config = new TypeAdapterConfig();
-            config.NewConfig<Question, UpsertQuesDtoWithExam>()
-                  .Map(dest => dest.QuestionType, src => src.QuestionType.ToString());
-
-            var examDto = exam.Adapt<ExamDto>(config);
-
-            return examDto != null ? Ok(examDto) : NotFound($"Exam With Id: {id} Not Found ");
+            if (exam == null) return NotFound($"Exam With Id: {id} Not Found");
+            var examDto = new {
+                exam.Id,
+                exam.Title,
+                exam.Description,
+                exam.Duration,
+                exam.CreatedAt,
+                Questions = exam.Questions.Select(q => new {
+                    q.Id,
+                    q.QuestionText,
+                    q.QuestionType
+                    // Add more fields as needed, but avoid navigation properties
+                })
+            };
+            return Ok(examDto);
         }
 
         [Authorize(Roles = "Teacher")]
@@ -69,6 +76,7 @@ namespace Exam_System.Controllers
             {
                 Title = examModel.Title,
                 Description = examModel.Description,
+
                 ApplicationUserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
                 CreatedAt = DateTime.Now,
                 Duration = examModel.Duration,
