@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Exam_System.Migrations
 {
     /// <inheritdoc />
-    public partial class createDb : Migration
+    public partial class init : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -238,7 +238,7 @@ namespace Exam_System.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     QuestionId = table.Column<int>(type: "int", nullable: false),
                     ChoiceText = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    IsCorrect = table.Column<bool>(type: "bit", nullable: false, defaultValue: false)
+                    IsCorrect = table.Column<bool>(type: "bit", nullable: false, defaultValueSql: "0")
                 },
                 constraints: table =>
                 {

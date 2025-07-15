@@ -72,7 +72,7 @@ namespace Exam_System.Controllers
             {
                 Title = examModel.Title,
                 Description = examModel.Description,
-                ApplicationUserId = "509f5459-2c9e-4623-a63b-42c69b9fb698", //User.FindFirstValue(ClaimTypes.NameIdentifier),
+                ApplicationUserId = "3c134d7c-2bbd-4209-9896-0a1a98b300cd", //User.FindFirstValue(ClaimTypes.NameIdentifier),
                 CreatedAt = DateTime.Now,
                 Duration = examModel.Duration,
                 Questions = examModel.Questions.Select(q => new Question
