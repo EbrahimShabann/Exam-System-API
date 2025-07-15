@@ -4,7 +4,7 @@ A RESTful ASP.NET Core Web API that powers the Exam System platform. This backen
 
 ## 🌐 Live API
 
-🔗 [https://exampro.runasp.net/api/swagger](https://exampro.runasp.net/api/swagger)
+🔗 [(https://exampro.runasp.net/swagger/index.html)](https://exampro.runasp.net/api/swagger)
 
 This API is used by the Angular frontend hosted at:  
 🔗 [https://ebrahimshabann.github.io/ExamSystemUI/](https://ebrahimshabann.github.io/ExamSystemUI/)
