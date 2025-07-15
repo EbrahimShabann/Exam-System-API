@@ -1,0 +1,27 @@
+# Runtime image
+FROM mcr.microsoft.com/dotnet/aspnet:7.0 AS base
+WORKDIR /app
+EXPOSE 80
+
+# Build image
+FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
+WORKDIR /src
+
+# Copy the project file first (note the correct path and name)
+COPY ["ExamSystem.csproj", "./"]
+
+# Restore dependencies
+RUN dotnet restore "ExamSystem.csproj"
+
+# Copy the remaining source code
+COPY . .
+
+# Build and publish
+RUN dotnet build "ExamSystem.csproj" -c Release --no-restore
+RUN dotnet publish "ExamSystem.csproj" -c Release -o /app/publish --no-restore
+
+# Final image
+FROM base AS final
+WORKDIR /app
+COPY --from=build /app/publish .
+ENTRYPOINT ["dotnet", "ExamSystem.dll"]
