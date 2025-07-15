@@ -373,6 +373,32 @@ namespace Exam_System.Controllers
                     r.ExamId,
                     ExamTitle = r.Exam.Title,
                     r.Degree,
+                    r.SubmittedAt,
+                    StudentAnswers = uof.StudentAnswerRepo.GetAll()
+                        .Where(a => a.ExamId == r.ExamId && a.ApplicationUserId == studentId)
+                        .Select(a => new {
+                            a.QuestionId,
+                            a.ChoiceId,
+                            a.TextAnswer,
+                            a.IsCorrect
+                        }).ToList()
+                })
+                .ToList();
+            return Ok(results);
+        }
+
+        [Authorize(Roles = "Teacher")]
+        [HttpGet("{examId}/results")]
+        public IActionResult GetExamResults(int examId)
+        {
+            var results = uof.ResultRepo.GetAll()
+                .Where(r => r.ExamId == examId)
+                .Select(r => new {
+                    r.Id,
+                    r.ExamId,
+                    StudentId = r.ApplicationUserId,
+                    StudentName = userManager.FindByIdAsync(r.ApplicationUserId).Result.UserName,
+                    r.Degree,
                     r.SubmittedAt
                 })
                 .ToList();
