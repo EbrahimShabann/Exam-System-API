@@ -46,7 +46,7 @@ namespace Exam_System.Services.ReposService.Repos
 
 
 
-        public IEnumerable<T> GetAll(
+        public IQueryable<T> GetAll(
          Expression<Func<T, bool>>? filter = null,
          params string[] includes)
         {
@@ -60,7 +60,7 @@ namespace Exam_System.Services.ReposService.Repos
             if (filter != null)
                 query = query.Where(filter);
 
-            return query.ToList();
+            return query;
         }
 
         public T GetById(int id, params string[] includes)

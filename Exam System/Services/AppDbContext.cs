@@ -1,4 +1,5 @@
 ﻿using Exam_System.Models;
+using ExamSystem.Models;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,6 +13,7 @@ namespace Exam_System.Services
         public DbSet<Choice> Choices{ get; set; }
         public DbSet<StudentAnswer> StudentAnswers{ get; set; }
         public DbSet<Result> Results { get; set; }
+        public DbSet<OTP> OTPs{ get; set; }
         public AppDbContext(DbContextOptions options):base(options)
         {
             

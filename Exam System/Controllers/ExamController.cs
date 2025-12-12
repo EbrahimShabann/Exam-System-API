@@ -1,12 +1,16 @@
 ﻿using Exam_System.Models;
 using Exam_System.Services.DTOs;
 using Exam_System.Services.ReposService.IRepos;
+using ExamSystem.Services.EmailService;
+using Hangfire;
 using Mapster;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 using System.Security.Claims;
+using System.Threading.Tasks;
 
 namespace Exam_System.Controllers
 {
@@ -17,26 +21,46 @@ namespace Exam_System.Controllers
         
         private readonly IUnitOfWork uof;
         private readonly UserManager<ApplicationUser> userManager;
+        private readonly IEmailService emailService;
+        private readonly IMemoryCache memoryCache;
 
-        public ExamController(IUnitOfWork uof, UserManager<ApplicationUser> userManager)
+        public ExamController(IUnitOfWork uof, UserManager<ApplicationUser> userManager,
+                IEmailService emailService,IMemoryCache memoryCache)
         {
           
             this.uof = uof;
             this.userManager = userManager;
+            this.emailService = emailService;
+            this.memoryCache = memoryCache;
         }
         [HttpGet("GetAllExams")]
         public IActionResult GetExams()
         {
-            var exams = uof.ExamRepo.GetAll().Select(e => new ExamDto
+            var cacheKey = "allExams";
+            //try to get data from cache
+            if (!memoryCache.TryGetValue(cacheKey, out var exams))
             {
-                Id=e.Id,
-                Title=e.Title,
-                Description=e.Description,
-                Duration=e.Duration,
-                CreatedBy = userManager.FindByIdAsync(e.ApplicationUserId).Result.UserName,
-                
-                //Questions
-            }).ToList();
+                exams = uof.ExamRepo.GetAll().Select(e => new ExamDto
+                {
+                    Id = e.Id,
+                    Title = e.Title,
+                    Description = e.Description,
+                    Duration = e.Duration,
+                    CreatedBy = userManager.FindByIdAsync(e.ApplicationUserId).Result.UserName,
+
+                    //Questions
+                }).ToList();
+
+                var cacheOptions = new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1),
+                    SlidingExpiration=TimeSpan.FromMinutes(10)
+                    
+                };
+                //set data in cache
+                memoryCache.Set(cacheKey, exams, cacheOptions);
+            }
+           
             return exams != null ? Ok(exams) : NotFound("No exams found.");
 
         }
@@ -45,26 +69,37 @@ namespace Exam_System.Controllers
         public IActionResult GetExamById(int id)
         {
             var exam = uof.ExamRepo.GetById(id);
-            if (exam == null) return NotFound($"Exam With Id: {id} Not Found");
-            var examDto = new {
+            if (exam == null)
+                return NotFound($"Exam With Id: {id} Not Found");
+
+            // Force EF to load lazy-loaded Questions and Choices
+            var examDto = new
+            {
                 exam.Id,
                 exam.Title,
                 exam.Description,
                 exam.Duration,
                 exam.CreatedAt,
-                Questions = exam.Questions.Select(q => new {
+                Questions = exam.Questions.Select(q => new
+                {
                     q.Id,
                     q.QuestionText,
-                    q.QuestionType
-                    // Add more fields as needed, but avoid navigation properties
-                })
+                    q.QuestionType,
+                    Choices = q.Choices.Select(c => new
+                    {
+                        c.Id,
+                        c.ChoiceText,
+                        c.IsCorrect
+                    }).ToList()
+                }).ToList()
             };
+
             return Ok(examDto);
         }
 
         [Authorize(Roles = "Teacher")]
         [HttpPost]
-        public IActionResult CreateExam(UpsertExamDTO examModel)
+        public async Task<IActionResult> CreateExam([FromBody] UpsertExamDTO examModel)
         {
             if (examModel == null)
             {
@@ -127,13 +162,14 @@ namespace Exam_System.Controllers
             };
 
             uof.ExamRepo.Add(exam);
-            uof.Save();
+            await uof.SaveAsync();
+            memoryCache.Remove("allExams"); // Invalidate cache
             return CreatedAtAction(nameof(GetExamById), new { id = exam.Id }, exam);
         }
 
         [HttpPut("{id}")]
         [Authorize(Roles = "Teacher")]
-        public IActionResult EditExam([FromBody]UpsertExamDTO updatedExam,[FromRoute] int id)
+        public async Task<IActionResult> EditExam([FromBody]UpsertExamDTO updatedExam,[FromRoute] int id)
         {
             var examFromDb = uof.ExamRepo.GetById(id);
             if (examFromDb == null) return BadRequest();
@@ -158,13 +194,13 @@ namespace Exam_System.Controllers
             }).ToList();
 
             uof.ExamRepo.Update(examFromDb);
-            uof.Save();
+            await uof.SaveAsync();
             return Ok(examFromDb);
 
         }
         [HttpDelete("{id}")]
         [Authorize(Roles = "Teacher")]
-        public IActionResult DeleteExam([FromRoute]int id)
+        public async Task<IActionResult> DeleteExam([FromRoute]int id)
         {
             var examFromDb = uof.ExamRepo.GetById(id);
             if (examFromDb == null) return NotFound(new { message = $"Exam with Id: {id} Not Found." });
@@ -180,7 +216,7 @@ namespace Exam_System.Controllers
             uof.ChoiceRepo.RemoveRange(choicesofQues);
             uof.QuesRepo.RemoveRange(quesOfExam);
             uof.ExamRepo.Delete(examFromDb);
-            uof.Save();
+            await uof.SaveAsync();
             return Ok(new { message = $"Exam with Id: {id} deleted successfully." });
 
         }
@@ -190,16 +226,32 @@ namespace Exam_System.Controllers
         public IActionResult GetAvailableExams(string? search = null, int page = 1, int pageSize = 10)
         {
             var studentId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var examsQuery = uof.ExamRepo.GetAll()
-                .Where(e => !e.Results.Any(r => r.ApplicationUserId == studentId));
-            if (!string.IsNullOrWhiteSpace(search))
-                examsQuery = examsQuery.Where(e => e.Title.Contains(search));
-            var total = examsQuery.Count();
+            var cacheKey = $"availableExams_{studentId}";
+
+            if (!memoryCache.TryGetValue(cacheKey, out IEnumerable<Exam> examsQuery))
+            {
+                examsQuery = uof.ExamRepo.GetAll()
+               .Where(e => !e.Results.Any(r => r.ApplicationUserId == studentId));
+
+                if (!string.IsNullOrWhiteSpace(search))
+                    examsQuery = examsQuery.Where(e => e.Title.Contains(search));
+               
+                var cacheOptions = new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1),
+                    SlidingExpiration = TimeSpan.FromMinutes(30)
+                };
+
+                memoryCache.Set(cacheKey, examsQuery, cacheOptions);
+            }
+
+            int total = examsQuery.Count();
             var exams = examsQuery
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .Select(e => new { e.Id, e.Title, e.Description })
                 .ToList();
+
             return Ok(new { total, exams });
         }
 
@@ -227,9 +279,11 @@ namespace Exam_System.Controllers
 
         [Authorize(Roles = "Student")]
         [HttpPost("{id}/submit")]
-        public IActionResult SubmitExam(int id, [FromBody] SubmitExamDto dto)
+        public async Task<IActionResult> SubmitExam(int id, [FromBody] SubmitExamDto dto)
         {
             var studentId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var studentEmail = User.FindFirstValue(ClaimTypes.Email);
+            var studentName = User.Identity.Name;
             var exam = uof.ExamRepo.GetAll().FirstOrDefault(e => e.Id == id);
             if (exam == null) return NotFound();
             var questions = exam.Questions.ToList();
@@ -302,7 +356,7 @@ namespace Exam_System.Controllers
                 Degree = (float)score,
                 SubmittedAt = DateTime.UtcNow
             });
-            uof.Save();
+            await uof.SaveAsync();
 
             // Build review structure
             var review = questions.Select(q => {
@@ -364,6 +418,10 @@ namespace Exam_System.Controllers
                     correctTextAnswer
                 };
             }).ToList();
+
+            //send mail to the student with the exam degree by hangfire
+            BackgroundJob.Enqueue(() => emailService.SendEmailAsync(studentEmail, $"{exam.Title} Exam Degree",
+                $"Hello {studentName} your degree at {exam.Title} Exam is: {score}"));
 
             return Ok(new { score, questions = review });
         }

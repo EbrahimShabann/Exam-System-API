@@ -10,7 +10,7 @@ namespace Exam_System.Services.ReposService.IRepos
         void Update(T entity);
         void Delete(T entity);
         void RemoveRange(IEnumerable<T> entities);
-        IEnumerable<T> GetAll(
+        IQueryable<T> GetAll(
         Expression<Func<T, bool>>? filter = null,
         params string[] includes);
 

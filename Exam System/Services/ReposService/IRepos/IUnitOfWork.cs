@@ -1,4 +1,5 @@
 ﻿using Exam_System.Models;
+using ExamSystem.Models;
 
 namespace Exam_System.Services.ReposService.IRepos
 {
@@ -9,6 +10,7 @@ namespace Exam_System.Services.ReposService.IRepos
         public IRepository<Choice> ChoiceRepo { get;  }
         public IRepository<StudentAnswer> StudentAnswerRepo { get; }
         public IRepository<Result> ResultRepo { get; }
-        void Save();
+        public IRepository<OTP> OTPsRepo { get; }
+        Task SaveAsync();
     }
 }

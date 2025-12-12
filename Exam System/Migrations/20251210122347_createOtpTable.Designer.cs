@@ -9,11 +9,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace Exam_System.Migrations
+namespace ExamSystem.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20250714112044_init")]
-    partial class init
+    [Migration("20251210122347_createOtpTable")]
+    partial class createOtpTable
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -27,6 +27,36 @@ namespace Exam_System.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+            modelBuilder.Entity("ExamSystem.Models.OTP", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ApplicationUserId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool>("IsValid")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("OTPCode")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("OTPGeneratedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserEmail")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationUserId");
+
+                    b.ToTable("OTPs");
+                });
 
             modelBuilder.Entity("Exam_System.Models.ApplicationUser", b =>
                 {
@@ -403,6 +433,15 @@ namespace Exam_System.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("ExamSystem.Models.OTP", b =>
+                {
+                    b.HasOne("Exam_System.Models.ApplicationUser", "User")
+                        .WithMany("otps")
+                        .HasForeignKey("ApplicationUserId");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Exam_System.Models.Choice", b =>
                 {
                     b.HasOne("Exam_System.Models.Question", "Question")
@@ -544,6 +583,8 @@ namespace Exam_System.Migrations
                     b.Navigation("Exams");
 
                     b.Navigation("Results");
+
+                    b.Navigation("otps");
                 });
 
             modelBuilder.Entity("Exam_System.Models.Exam", b =>
