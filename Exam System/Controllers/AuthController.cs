@@ -1,11 +1,14 @@
 using Exam_System.Models;
 using Exam_System.Services.DTOs;
+using ExamSystem.Models;
+using ExamSystem.Services;
+using ExamSystem.Services.AuthServices;
+using ExamSystem.Services.credintailsService;
+using ExamSystem.Services.EmailService;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
 using System.Data;
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
@@ -18,38 +21,70 @@ namespace Exam_System.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly IConfiguration _configuration;
-
+        private readonly JwtOptions jwtOptions;
+        private readonly AuthService AuthService;
+        private readonly ICredintailsService credintailsService;
+        private readonly IEmailService emailService;
 
         public AuthController(
             UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
-            IConfiguration configuration
+            IConfiguration configuration,
+            JwtOptions jwtOptions,
+            AuthService AuthService,
+            ICredintailsService credintailsService,
+            IEmailService emailService
+
+
             )
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _configuration = configuration;
-         
+            this.jwtOptions = jwtOptions;
+            this.AuthService = AuthService;
+            this.credintailsService = credintailsService;
+            this.emailService = emailService;
         }
 
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterDto model)
         {
-            //students only register 
-            var user = new ApplicationUser { UserName = model.Email, Email = model.Email, CreatedAt = DateTime.UtcNow };
-            user.EmailConfirmed = true; // Assuming email confirmation is not required for simplicity
-            var result = await _userManager.CreateAsync(user, model.Password);
+            var result= await credintailsService.registerAsync(model);
+
+            if(result.success)
+                //send email with otp
+                await emailService.SendEmailAsync(model.Email, "OTP Code Validation", 
+                $"Your OTP Code is {result.otp}\ncode is valid for only one time");
 
 
-            if (!result.Succeeded)
-                return BadRequest(result.Errors);
-            else
-                await _userManager.AddToRoleAsync(user, StaticDetails.StudentRole);
-            return Ok(new { Message = "User registered successfully" }); // ? JSON
+            return result.success? Ok(new { message = result.message , success=result.success}) 
+                                 : BadRequest(new{message= result.message, success=result.success });        
         }
 
-        [HttpPost("login")]
-       
+        [HttpPost("validate-otp")]
+        public async Task<IActionResult> ValidateOTP([FromBody] otpValidationDto dto )
+        {
+            var isValid = await credintailsService.ValidateOTPAsync(dto.email,dto.otpCode);
+           
+            return isValid? Ok(new { message = "OTP validated successfully." }) 
+                          : BadRequest(new { message = "Invalid or expired OTP." });
+            ;
+        }
+
+        [HttpGet("resend-otp")]
+        public async Task<IActionResult> ResendOTP( string userEmail)
+        {
+           var otp = await credintailsService.GenerateOTP(userEmail);
+
+           //send email with otp
+           await emailService.SendEmailAsync(userEmail, "OTP Code Validation",
+           $"Your OTP Code is {otp.OTPCode}\ncode is valid for only one time");
+
+           return Ok(new { message = "OTP resent successfully." });
+        }
+
+        [HttpPost("login")]   
         public async Task<IActionResult> Login([FromBody] LoginDto model)
         {
             var user = await _userManager.FindByEmailAsync(model.Email);
@@ -61,34 +96,14 @@ namespace Exam_System.Controllers
                 return Unauthorized();
 
             var userRole = _userManager.GetRolesAsync(user).Result.FirstOrDefault();
-            var token = GenerateJwtToken(user, userRole);
+           
+
+            var token = AuthService.GenerateJwtToken(user, userRole);
            
             return Ok(new { token=token ,userRole=userRole});
         }
 
-        private string GenerateJwtToken(ApplicationUser user,string userRole)
-        {
-            var claims = new[]
-            {
-                new Claim(JwtRegisteredClaimNames.Sub, user.Email),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new Claim(ClaimTypes.NameIdentifier, user.Id), 
-                new Claim(ClaimTypes.Email, user.Email),       
-                new Claim(ClaimTypes.Role, userRole)
-            };
-
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-            var token = new JwtSecurityToken(
-                issuer: _configuration["Jwt:Issuer"],
-                audience: null,
-                claims: claims,
-                expires: DateTime.UtcNow.AddHours(1),
-                signingCredentials: creds);
-
-            return new JwtSecurityTokenHandler().WriteToken(token);
-        }
+        
 
         [Authorize]
         [HttpGet("me/username")]
@@ -101,6 +116,79 @@ namespace Exam_System.Controllers
             var roles = await _userManager.GetRolesAsync(user);
             var role = roles.FirstOrDefault();
             return Ok(new { username = user.UserName, role });
+        }
+
+        [HttpGet("LoginWithGoogle")]
+        public async Task<IActionResult> LoginWithGoogle() 
+        {
+            string state = Guid.NewGuid().ToString();
+            HttpContext.Session.SetString("OAuthState", state);
+
+            string url;
+            if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development")
+            {
+                //url = _configuration.GetValue<string>("OAuthDevelopmentUrl") ;
+                url = _configuration["OAuthDevelopmentUrl"] ;
+            }
+            else
+            {
+                url = _configuration.GetValue<string>("OAuthProductionUrl") ;
+            }
+
+            var authUrl = $"https://accounts.google.com/o/oauth2/v2/auth?" +
+                $"client_id={_configuration["Google:ClientID"]}" +
+                $"&redirect_uri={url}" +
+                "&response_type=code" +
+                "&scope=openid%20email%20profile" +
+                $"&state={state}";
+
+            return Redirect(authUrl);
+        }
+
+        [HttpGet("Callback")]
+        public async Task<IActionResult> Callback(string code, string state)
+        {
+            string savedState = HttpContext.Session.GetString("OAuthState");
+
+            if(state != savedState)
+                 return BadRequest("Invalid state parameter");
+
+            //Exchange Code For Tokens to get Id Token
+            var tokenResponse = await AuthService.ExchangeCodeForTokens(code);
+
+            //Decode Id Token to JWT Token to get google user Info
+            var googleUser = AuthService.DecodeIdToken(tokenResponse.IdToken);
+
+            //Create or find this google user in database
+            var appUser = await AuthService.FindOrCreateUser(googleUser);
+            var userRole =_userManager.GetRolesAsync(appUser).Result.FirstOrDefault();
+
+            string token = AuthService.GenerateJwtToken(appUser, userRole);
+
+            HttpContext.Response.Cookies.Append("token", token,
+                new CookieOptions { 
+                    HttpOnly=false,
+                    Secure=true,
+                    SameSite=SameSiteMode.None,
+                    Domain="localhost",
+                    Path="/",
+                    Expires=DateTimeOffset.UtcNow.AddMinutes(jwtOptions.Lifetime)
+
+                });
+            HttpContext.Response.Cookies.Append("UserRole", userRole, new CookieOptions
+            {
+                HttpOnly = false,
+                Secure = true,
+                SameSite = SameSiteMode.None,
+                Domain = "localhost",
+                Path = "/",
+                Expires = DateTimeOffset.UtcNow.AddMinutes(jwtOptions.Lifetime)
+
+            });
+            //return Ok(new { token = token, userRole = userRole });
+            return Redirect("http://localhost:4200/home");
+
+
         }
     }
 }

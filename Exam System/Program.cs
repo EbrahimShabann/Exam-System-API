@@ -1,16 +1,19 @@
-using Exam_System.Services;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
-using System.Text;
 using Exam_System.Models;
-using Microsoft.AspNetCore.Builder;
+using Exam_System.Services;
 using Exam_System.Services.DbInitializer;
-using System.Threading.Tasks;
 using Exam_System.Services.ReposService.IRepos;
 using Exam_System.Services.ReposService.Repos;
-using System.Security.Claims;
+using ExamSystem.Models;
+using ExamSystem.Services;
+using ExamSystem.Services.AuthServices;
+using ExamSystem.Services.credintailsService;
+using ExamSystem.Services.EmailService;
+using Hangfire;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 namespace Exam_System
 {
@@ -19,14 +22,36 @@ namespace Exam_System
         public static async Task Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
-            var txt = "";
             // Add services to the container.
+            builder.Services.AddOpenApi();
+
+            //register hangfire
+            builder.Services.AddHangfire(config => config.UseSqlServerStorage(builder.Configuration.GetConnectionString("cs")));
+            builder.Services.AddHangfireServer();
+
+
             builder.Services.AddControllers().AddJsonOptions(options =>
             {
+                //to solve cycle problem of navigation probertites when Serialization
                 options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
             }); 
+            //register dependencies
             builder.Services.AddScoped<IDbInitializer,DbInitializer>();
             builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+            builder.Services.AddScoped<AuthService>();
+            builder.Services.AddScoped<IEmailService, EmailService>();
+            builder.Services.AddScoped<ICredintailsService, CredintailsService>();
+            builder.Services.AddScoped<BGJobsService>();
+
+
+
+            //register memory cache
+            builder.Services.AddMemoryCache();
+
+
+            var jwt = builder.Configuration.GetSection("Jwt").Get<JwtOptions>();
+
+            builder.Services.AddSingleton<JwtOptions>(jwt);
             // Add and configure Swagger/OpenAPI
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen(options =>
@@ -69,46 +94,41 @@ namespace Exam_System
                 .AddEntityFrameworkStores<AppDbContext>()
                 .AddDefaultTokenProviders();
 
+            builder.Services.AddDistributedMemoryCache();
+            builder.Services.AddSession();
 
             //enable CORS
             builder.Services.AddCors(options =>
             {
-                options.AddPolicy(txt,
-                builder => builder
-                    .AllowAnyOrigin()
-                    .AllowAnyMethod()
-                    .AllowAnyHeader());
-
+               
                 // Add CORS policy for Angular frontend
                 options.AddPolicy("AllowAngular",
                     builder => builder
-                        .WithOrigins("http://localhost:4200")
+                        .WithOrigins("http://localhost:4200") //WithOrigins("https://ebrahimshabann.github.io") 
                         .AllowAnyHeader()
                         .AllowAnyMethod()
                         .AllowCredentials());
             });
-            // Configure JWT Authentication
-            var jwtKey = builder.Configuration["Jwt:Key"];
-            var jwtIssuer = builder.Configuration["Jwt:Issuer"];
+
+            // Configure JWT Authentication           
             builder.Services.AddAuthentication(options =>
             {
                 options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
                 options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-            })
-            .AddJwtBearer(options =>
+            }
+            )
+            .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
             {
+                options.SaveToken = true;
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
-                    ValidateAudience = false,
+                    ValidIssuer = jwt.Issuer,
+                    ValidateAudience = true,
+                    ValidAudience = jwt.Audience,
                     ValidateLifetime = true,
-                    ValidateIssuerSigningKey = true,
-                    ValidIssuer = jwtIssuer,
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-                    RoleClaimType=ClaimTypes.Role,
-
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Key)),
                 };
-                options.MapInboundClaims = false; // Disable automatic mapping of claims coz it's mapping userName to name identifier
             });
             builder.Services.AddAuthorization();
 
@@ -120,10 +140,10 @@ namespace Exam_System
                 await initializer.Initialize();
             }
 
-            if (app.Environment.IsDevelopment())
-            {
+            //if (app.Environment.IsDevelopment())
+            //{
                 app.MapOpenApi();
-                app.UseSwagger();
+                //app.UseSwagger();
                 app.UseSwaggerUI(options =>
                 {
                     //options.SwaggerEndpoint("/openapi/v1.json", "v1");
@@ -132,15 +152,18 @@ namespace Exam_System
                 });
 
 
-            }
+            //}
 
             app.UseHttpsRedirection();
+            app.UseSession();
+           
 
             // CORS must be before UseAuthorization and MapControllers
             app.UseCors("AllowAngular");
-
             app.UseAuthentication();
             app.UseAuthorization();
+            app.UseHangfireDashboard("/dashboard");
+
             app.MapControllers();
 
             app.Run();

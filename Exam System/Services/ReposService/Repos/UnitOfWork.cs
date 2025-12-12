@@ -1,5 +1,6 @@
 ﻿using Exam_System.Models;
 using Exam_System.Services.ReposService.IRepos;
+using ExamSystem.Models;
 using Microsoft.AspNetCore.Localization;
 
 namespace Exam_System.Services.ReposService.Repos
@@ -12,6 +13,7 @@ namespace Exam_System.Services.ReposService.Repos
         IRepository<Choice> choiceRepo;
         IRepository<StudentAnswer> studentAnswerRepo;
         IRepository<Result> resultRepo;
+        IRepository<OTP> oTPsRepo;
         public UnitOfWork(AppDbContext db)
         {
             this.db = db;
@@ -65,10 +67,19 @@ namespace Exam_System.Services.ReposService.Repos
                 return resultRepo;
             }
         }
-
-        public void Save()
+        public IRepository<OTP> OTPsRepo
         {
-            db.SaveChanges();
+            get
+            {
+                if (oTPsRepo != null) return oTPsRepo;
+                oTPsRepo = new Repository<OTP>(db);
+                return oTPsRepo;
+            }
+        }
+
+        public async Task SaveAsync()
+        {
+           await db.SaveChangesAsync();
         }
 
     }

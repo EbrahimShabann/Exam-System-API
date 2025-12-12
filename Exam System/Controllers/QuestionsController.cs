@@ -35,7 +35,7 @@ namespace Exam_System.Controllers
 
             };
             uof.QuesRepo.Add(NewQues);
-            uof.Save();
+            uof.SaveAsync();
             //return CreatedAtAction(nameof(GetQuestionById), new { id = NewQues.Id }, NewQues);
             return Ok(NewQues);
 
@@ -55,7 +55,7 @@ namespace Exam_System.Controllers
             var NewChoice = choiceDto.Adapt<Choice>();
             
             uof.ChoiceRepo.Add(NewChoice);
-            uof.Save();
+            uof.SaveAsync();
             //return CreatedAtAction(nameof(GetQuestionById), new { id = NewQues.Id }, NewQues);
             return Ok(NewChoice);
 
@@ -87,7 +87,7 @@ namespace Exam_System.Controllers
                 quesFromDb.ExamId = quesDto.ExamId;
 
             uof.QuesRepo.Update(quesFromDb);
-            uof.Save();
+            uof.SaveAsync();
             return Ok(quesFromDb);
         }
 
@@ -100,7 +100,7 @@ namespace Exam_System.Controllers
             if (quesFromDb == null)
                 return NotFound($"Question with ID: {id} not found.");
             uof.QuesRepo.Delete(quesFromDb);
-            uof.Save();
+            uof.SaveAsync();
             return Ok("Deleted Successfully"); // 204 No Content
         }
     }

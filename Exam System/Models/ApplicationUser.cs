@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using ExamSystem.Models;
+using Microsoft.AspNetCore.Identity;
 using System.ComponentModel.DataAnnotations;
 
 namespace Exam_System.Models
@@ -9,6 +10,7 @@ namespace Exam_System.Models
         public DateTime CreatedAt { get; set; }
         public virtual List<Exam> Exams { get; set; }
         public virtual List<Result> Results { get; set; }
+        public virtual List<OTP> otps { get; set; }
 
     }
 }
